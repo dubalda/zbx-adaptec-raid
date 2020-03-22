@@ -13,10 +13,10 @@
 # Github: https://github.com/GOID1989/zbx-adaptec-raid
 #
 
-cli='/usr/StorMan/arcconf'
+cli="ssh $1@$2 arcconf"
 
-action=$1
-part=$2
+action=$3
+part=$4
 
 LLDControllers() {
     ctrl_count=$($cli GETCONFIG 1 AL | grep "Controllers found:" | cut -f2 -d":" | sed -e 's/^ //' )
@@ -49,11 +49,12 @@ LLDBattery() {
     bt_json=""
     while [ $i -le $ctrl_count ]
     do
+        ctrl_bt=$($cli GETCONFIG $i AD | grep "Overall Backup Unit Status" )
 	#ctrl_bt=$($cli GETCONFIG $i AD | grep "Controller Battery Information" )
 	len=${#ctrl_bt}
 	if [ $len -ne 0 ]
 	then
-	    bt_status=$($cli GETCONFIG $ctrl_id AD | grep -E "^\s+Status\s+[:]" | cut -f2 -d":" | sed -e 's/^ //' )
+	    bt_status=$($cli GETCONFIG $i AD | grep -E "^\s+Overall Backup Unit Status\s+[:]" | cut -f2 -d":" | sed -e 's/^ //' )
 	    len=${#bt_status}
 	    if [ $len -ne 0 ]
 	    then
@@ -81,7 +82,7 @@ LLDLogicalDrives() {
     do
 	ld_count=$($cli GETCONFIG $i AD | grep "Logical devices/Failed/Degraded" | cut -f2 -d":" | cut -f1 -d"/" | sed -e 's/^ //' )
 	
-	ld_ids=$($cli GETCONFIG $i LD | grep "Logical device number " | cut -f4 -d" " | sed -e 's/^ //' )
+	ld_ids=$($cli GETCONFIG $i LD | grep "Logical Device number " | cut -f4 -d" " | sed -e 's/^ //' )
 	
 	for ld_id in $ld_ids; do
 	    ld_name=$($cli GETCONFIG $i LD $ld_id | grep "Logical device name" | cut -f2 -d":" | sed -e 's/^ //' )
@@ -145,7 +146,7 @@ GetControllerStatus() {
 	    ctrl_status=$($cli GETCONFIG $ctrl_id AD | grep "Controller Status" | cut -f2 -d":" | sed -e 's/^ //' )
 	;;
 	"battery")
-	    ctrl_status=$($cli GETCONFIG $ctrl_id AD | grep -E "^\s+Status\s+[:]" | cut -f2 -d":" | sed -e 's/^ //' )
+	    ctrl_status=$($cli GETCONFIG $ctrl_id AD | grep -E "^\s+Overall Backup Unit Status\s+[:]" | cut -f2 -d":" | sed -e 's/^ //' )
 	;;
 	"temperature")
 	    ctrl_status=$($cli GETCONFIG $ctrl_id AD | grep -E "^\s+Temperature\s+[:]" | cut -f2 -d":" | awk '{print $1}' )
@@ -159,7 +160,7 @@ GetLogicalDriveStatus() {
     ctrl_id=$1
     ld_id=$2
 
-    ld_status=$($cli GETCONFIG $ctrl_id LD $ld_id | grep "Status of logical device" | cut -f2 -d":" | sed -e 's/^ //' )
+    ld_status=$($cli GETCONFIG $ctrl_id LD $ld_id | grep "Status of Logical Device" | cut -f2 -d":" | sed -e 's/^ //' )
 
     echo $ld_status
 }
@@ -172,6 +173,9 @@ GetPhysicalDriveStatus() {
     echo ${pd_status[$pd_id]}
 }
 
+touch ~/adaptec-raid.log
+NOW=$(date +"%m-%d-%Y %H.%M.%S")
+echo "$NOW start with parametres $1 $2 $3 $4 $5 $6" >> ~/adaptec-raid.log
 
 case "$action" in
     "lld")
@@ -193,13 +197,13 @@ case "$action" in
     "health")
 	case "$part" in
 	    "ad")
-		GetControllerStatus "$3" "$4"
+		GetControllerStatus "$5" "$6"
 	    ;;
 	    "ld")
-		GetLogicalDriveStatus "$3" "$4"
+		GetLogicalDriveStatus "$5" "$6"
 	    ;;
 	    "pd")
-		GetPhysicalDriveStatus "$3" "$4"
+		GetPhysicalDriveStatus "$5" "$6"
 	    ;;
 	esac
     ;;
